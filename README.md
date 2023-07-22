@@ -1,17 +1,30 @@
-# Script to migrate all local devices between balenaCloud environments. 
+# balenaMigrate
 
-# Steps: 
+> Script to migrate balena devices to a new balenaCloud environment
 
-1. Scan for devices (Needs balenaCLI to be installed)
+## Get Started 
+
+Provide the values for the variables provided in the script and install [balena-cli](https://github.com/balena-io/balena-cli/blob/master/INSTALL.md).
+
+```
+npm ci -g 
+zx --quiet index.mjs
+```
+
+### Steps to migrate
+
+1. Scans for devices locally and in the fleet to cross-reference devices to migrate (Needs balenaCLI to be installed)
 2. SSH into devices and convert all devices to development OS variant
-3. Once complete, migrate devices to new target environement using balena join 
-4. Shows migrated devices in the new target fleet 
-5. Optionally you can convert all devices back to production OS variant after migration
+3. Once complete, migrate device to new target environement using balena join 
+4. Assigns device old configuration, tags, names and related settings 
 
-## Get Started
 
-1. install dependencies 
+## Tools used
 
-```
-npm install
-```
+1. LTS NodeJS and npm 
+2. [zx](https://github.com/google/zx) to write the migrator script
+3. balena-cli, balenaSDK to run the migration between environments 
+
+## License
+
+MIT License by Vipul Gupta.
