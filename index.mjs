@@ -190,6 +190,7 @@ for (const device of finalDevices) {
     }
 
     console.log(`Migrated ${device.name} to ${BALENA_TARGET_FLEET_SLUG}\n ✅`)
+    await balena_targetsdk.models.device.setNote(uuidTarget, `Migrated from ${BALENA_SOURCE_FLEET_URL} on ${new Date().toUTCString()}`)
     migratedDevices++
 }
 
