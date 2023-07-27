@@ -2,8 +2,8 @@
 
 // Script to migrate all local devices between balenaCloud environments. Read README.md for detailled instructions. 
 
-$.shell = '/usr/bin/bash'
-$.prefix = ''
+$.shell = '/usr/bin/bash'  // zx can't run on sh in Alpine correctly: https://github.com/google/zx/issues/164
+$.prefix = '' 
 
 const { getSdk } = require('balena-sdk');
 
@@ -36,7 +36,7 @@ const finalDevices = []
 // Cross-reference local and source fleet devices to create final list of online, local devices
 for (const device of localDevices) {
     for (const sourceDevice of sourceDevices) {
-        if (sourceDevice.uuid.substring(0, 7) === device.host.substring(0, 7)) {
+        if (sourceDevice.uuid.substring(0, 7) === device.address.substring(0, 7)) {
             device["name"] = sourceDevice.device_name
             device["uuid"] = sourceDevice.uuid
             delete device.dockerInfo
@@ -76,10 +76,11 @@ for (const device of finalDevices) {
          *
          * # ***** End file ******
          */
-        await $`cat devmode_on.sh | balena ssh ${device.host}`
+        await $`cat devmode_on.sh | balena ssh ${device.address}`
         console.log(`Converted ${device.name} to dev mode ✅`)
     } catch (e) {
-        console.log(e)
+        console.error(e)
+        process.kill(1)
     }
 }
 
@@ -124,41 +125,43 @@ for (const device of finalDevices) {
     const sourceDeviceTags = await balena_sourcesdk.models.device.tags.getAllByDevice(device.uuid)
 
     // Store Device Note
-    const sourceDeviceNote = await balena_sourcesdk.models.device.get(device.uuid).note
+    const sourceDeviceNote = (await balena_sourcesdk.models.device.get(device.uuid)).note
 
     console.log(`Stored ${device.name}'s device level configuration, tags, variables ✅`)
 
     // Joining target fleet
     try {
         console.log(`\nMigrating ${migratedDevices} out of ${finalDevices.length} devices`)
-        await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena join ${device.host} --fleet ${BALENA_TARGET_FLEET_SLUG} --pollInterval 1`
+        await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena join ${device.address} --fleet ${BALENA_TARGET_FLEET_SLUG} --pollInterval 1`
         console.log(`Device successfully joined ${BALENA_TARGET_FLEET_URL} ✅ Find it in ${BALENA_TARGET_FLEET_SLUG} \n`)
+        await $`echo "systemctl restart prepare-openvpn" | balena ssh ${device.address}`
+        // Waiting for it to join
+        await sleep(20000)
     } catch (e) {
-        if (e.stderr.split('\n')[0] === "Error: Awaiting prepare-openvpn.service to exit failed") {
-            console.log("Detected known error. Deploying troubleshooting steps.")
-            await $`echo "os-config update" | balena ssh ${device.host}`
-            console.log(`Device successfully joined ${BALENA_TARGET_FLEET_URL} ✅ Find it in ${BALENA_TARGET_FLEET_SLUG} \n`)
-
-            // Waiting for it to join
-            await sleep(20000)
-        } else {
-            console.log(e)
-            process.kill(1)
-        }
+        console.log("Detected known error. Deploying troubleshooting steps.")
+        await $`echo "os-config update" | balena ssh ${device.address}`
+        console.log(`Device successfully joined ${BALENA_TARGET_FLEET_URL} ✅ Find it in ${BALENA_TARGET_FLEET_SLUG} \n`)
+        // Waiting for it to join
+        await sleep(20000)
     }
 
     let uuidFinder = true
     let uuidTarget = null
     while (uuidFinder) {
-        if (await balena_targetsdk.models.device.isOnline(device.uuid)) {
-            uuidTarget = device.uuid
-            uuidFinder = false
-        } else {
-            uuidTarget = await $`echo "cat /mnt/boot/config.json | jq .uuid" | balena ssh ${device.host}`
-            uuidTarget = uuidTarget.toString().replace(/['"]+/g, '').trim()
-            if (await balena_targetsdk.models.device.isOnline(uuidTarget)) {
+        try {
+
+            if (await balena_targetsdk.models.device.isOnline(device.uuid)) {
+                uuidTarget = device.uuid
                 uuidFinder = false
+            } else {
+                uuidTarget = await $`echo "cat /mnt/boot/config.json | jq .uuid" | balena ssh ${device.address}`
+                uuidTarget = uuidTarget.toString().replace(/['"]+/g, '').trim()
+                if (await balena_targetsdk.models.device.isOnline(uuidTarget)) {
+                    uuidFinder = false
+                }
             }
+        } catch (error) {
+            // Do Nothing
         }
     }
 
@@ -197,6 +200,8 @@ for (const device of finalDevices) {
     if (sourceDeviceNote) {
         await balena_targetsdk.models.device.setNote(uuidTarget, sourceDeviceNote + ` - Migrated from ${BALENA_SOURCE_FLEET_URL} on ${new Date().toUTCString()}`)
         console.log("Migrated Device Note ✅")
+    } else {
+        await balena_targetsdk.models.device.setNote(uuidTarget, `Migrated from ${BALENA_SOURCE_FLEET_URL} on ${new Date().toUTCString()}`)
     }
 
     // Transfer Device variables

@@ -4,7 +4,7 @@
 
 ## Get Started 
 
-First install [balena-cli](https://github.com/balena-io/balena-cli/blob/master/INSTALL.md) and clone the repository. Next, provide the values of `Source` and `Target` in the `index.mjs` script and run the following command to initiate the migration
+The script needs latest balenaCLI. First install [balena-cli](https://github.com/balena-io/balena-cli/blob/master/INSTALL.md) and clone the repository. Next, provide the values of `Source` and `Target` in the `index.mjs` script and run the following command to initiate the migration. The script has only been tested using bash. 
 
 ```bash
 sudo balena scan # this is to confirm CLI is installed correctly
