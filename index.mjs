@@ -1,13 +1,6 @@
 #!/usr/bin/env zx
 
-// Script to migrate all local devices between balenaCloud environments. Steps:
-
-/**
- * 1. Scans for devices locally and in the fleet to cross-reference devices to migrate (Needs balenaCLI to be installed)
- * 2. SSH into devices and convert all devices to development OS variant
- * 3. Once complete, migrate device to new target environement using balena join
- * 4. Assigns device old configuration, tags, names and related settings
- */
+// Script to migrate all local devices between balenaCloud environments. Read README.md for detailled instructions. 
 
 $.shell = '/usr/bin/bash'
 $.prefix = ''
@@ -67,8 +60,6 @@ await question(`Migrating ${Object.keys(finalDevices).length} devices. Press ent
 // Login to source fleet
 await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena login --token ${BALENA_SOURCE_FLEET_TOKEN}`
 await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena whoami`
-
-// await spinner('If this isnt correct, stop now... waiting 5 seconds', () => $`sleep 5`)
 
 // Convert devices to dev mode
 for (const device of finalDevices) {
@@ -131,6 +122,10 @@ for (const device of finalDevices) {
 
     // Store Device Tags
     const sourceDeviceTags = await balena_sourcesdk.models.device.tags.getAllByDevice(device.uuid)
+
+    // Store Device Note
+    const sourceDeviceNote = await balena_sourcesdk.models.device.get(device.uuid).note
+
     console.log(`Stored ${device.name}'s device level configuration, tags, variables ✅`)
 
     // Joining target fleet
