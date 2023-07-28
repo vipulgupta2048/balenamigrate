@@ -5,12 +5,15 @@ FROM node:16-bullseye-slim as base
 # hadolint ignore=DL3008
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
-	bind9-dnsutils \
-	docker.io \
-	iproute2 \
+	ca-certificates \
+	wget \
+	nano \
 	openssh-client \
+	bind9-dnsutils \
+	libudev-dev \	
 	util-linux \
 	build-essential \
+	make \
 	python3 && \
 	apt-get clean && \
 	rm -rf /var/lib/apt/lists/*
@@ -18,6 +21,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 ARG BALENA_CLI_REF="v16.7.5"
 ARG BALENA_CLI_VERSION="16.7.5"
 
+WORKDIR /usr/app
 # Install balena-cli via standlone zip, only compatible with glibc (not alpine/musl)
 RUN if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ] ; \
 	then \
@@ -25,8 +29,7 @@ RUN if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ] ; \
 		unzip balena-cli.zip && rm balena-cli.zip ; \
 	elif [ "$(uname -m)" = "armv7l" ] || [ "$(uname -m)" = "armv7hf" ] ; \
 	then \
-		npm i balena-cli@latest ; \
-		mkdir /usr/app/cli/ ; \
+		npm i balena-cli ; \
 		mv /usr/app/node_modules/balena-cli/ /usr/app ; \
 		rm -rf /usr/app/node_modules/ ; \
 	else \
@@ -35,16 +38,19 @@ RUN if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ] ; \
 	fi
 
 # Add balena-cli to PATH
-ENV PATH /usr/app/balena-cli:$PATH
-# ENV PATH $PATH:/usr/app/balena-cli/bin
+#ENV PATH /usr/app/balena-cli:$PATH
+ENV PATH $PATH:/usr/app/balena-cli/bin
 
 RUN balena version
 
 COPY package*.json ./
 
-RUN npm ci -g
+RUN npm ci
 
 COPY . .
 
-CMD ['zx', '--quiet', 'index.mjs']
+RUN chmod +x entry.sh
+
+## Wait for us to go in and run script manually
+CMD ["entry.sh"]
 
