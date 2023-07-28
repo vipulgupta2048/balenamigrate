@@ -36,7 +36,7 @@ const finalDevices = []
 // Cross-reference local and source fleet devices to create final list of online, local devices
 for (const device of localDevices) {
     for (const sourceDevice of sourceDevices) {
-        if (sourceDevice.uuid.substring(0, 7) === device.address.substring(0, 7)) {
+        if (sourceDevice.uuid.substring(0, 7) === device.host.substring(0, 7)) {
             device["name"] = sourceDevice.device_name
             device["uuid"] = sourceDevice.uuid
             delete device.dockerInfo
@@ -134,9 +134,9 @@ for (const device of finalDevices) {
         console.log(`\nMigrating ${migratedDevices} out of ${finalDevices.length} devices`)
         await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena join ${device.address} --fleet ${BALENA_TARGET_FLEET_SLUG} --pollInterval 1`
         console.log(`Device successfully joined ${BALENA_TARGET_FLEET_URL} ✅ Find it in ${BALENA_TARGET_FLEET_SLUG} \n`)
-        await $`echo "systemctl restart prepare-openvpn" | balena ssh ${device.address}`
         // Waiting for it to join
-        await sleep(20000)
+        await sleep(10000)
+        await $`echo "systemctl restart prepare-openvpn" | balena ssh ${device.address}`
     } catch (e) {
         console.log("Detected known error. Deploying troubleshooting steps.")
         await $`echo "os-config update" | balena ssh ${device.address}`
@@ -198,7 +198,7 @@ for (const device of finalDevices) {
 
     // Transfer Device Note
     if (sourceDeviceNote) {
-        await balena_targetsdk.models.device.setNote(uuidTarget, sourceDeviceNote + ` - Migrated from ${BALENA_SOURCE_FLEET_URL} on ${new Date().toUTCString()}`)
+        await balena_targetsdk.models.device.setNote(uuidTarget, `Migrated from ${BALENA_SOURCE_FLEET_URL} on ${new Date().toUTCString()} - ` + sourceDeviceNote)
         console.log("Migrated Device Note ✅")
     } else {
         await balena_targetsdk.models.device.setNote(uuidTarget, `Migrated from ${BALENA_SOURCE_FLEET_URL} on ${new Date().toUTCString()}`)
@@ -212,7 +212,7 @@ for (const device of finalDevices) {
         console.log("Migrated Device variables ✅")
     }
 
-    console.log(`Migrated ${device.name} to ${BALENA_TARGET_FLEET_SLUG} ✅`)
+    console.log(`Migrated ${device.name} to ${BALENA_TARGET_FLEET_SLUG} ✅\n`)
     migratedDevices++
 }
 
