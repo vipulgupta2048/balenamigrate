@@ -3,7 +3,7 @@
 // Script to migrate all local devices between balenaCloud environments. Read README.md for detailled instructions. 
 
 $.shell = '/usr/bin/bash'  // zx can't run on sh in Alpine correctly: https://github.com/google/zx/issues/164
-$.prefix = '' 
+$.prefix = ''
 
 const { getSdk } = require('balena-sdk');
 
@@ -32,6 +32,13 @@ const sourceDevices = await balena_sourcesdk.models.device.getAllByApplication(B
 const localDevices = JSON.parse((await $`sudo balena scan --json`).stdout)
 
 const finalDevices = []
+
+// Remove offline devices from the source fleet
+for (const device in sourceDevices) {
+    if (!sourceDevices[device].is_connected_to_vpn && sourceDevices[device].api_heartbeat_state === "offline" && !sourceDevices[device].is_online) {
+        sourceDevices.splice(device)
+    }
+}
 
 // Cross-reference local and source fleet devices to create final list of online, local devices
 for (const device of localDevices) {
