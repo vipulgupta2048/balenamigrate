@@ -28,17 +28,23 @@ await balena_targetsdk.auth.loginWithToken(BALENA_TARGET_FLEET_TOKEN)
 // Fetch all devices in the source fleet
 const sourceDevices = await balena_sourcesdk.models.device.getAllByApplication(BALENA_SOURCE_FLEET_SLUG)
 
+console.log(`Migration Order Received: From ${BALENA_SOURCE_FLEET_URL} to ${BALENA_TARGET_FLEET_URL} over to ${BALENA_TARGET_FLEET_SLUG}`)
+
 // Scan local devices available
 const localDevices = JSON.parse((await $`sudo balena scan --json`).stdout)
 
 const finalDevices = []
 
-// Remove offline devices from the source fleet
+// Remove offline devices from the source fleet - More work needed. Giving false positives
+// Need to surface overall status in the device resources
 for (const device in sourceDevices) {
-    if (!sourceDevices[device].is_connected_to_vpn && sourceDevices[device].api_heartbeat_state === "offline" && !sourceDevices[device].is_online) {
+    if (!sourceDevices[device].is_connected_to_vpn && sourceDevices[device].api_heartbeat_state === "offline") {
+        console.log("Found offline devices in the fleet. Removing these from migration order:")
+        console.log(sourceDevices[device].device_name)
         sourceDevices.splice(device)
     }
 }
+
 
 // Cross-reference local and source fleet devices to create final list of online, local devices
 for (const device of localDevices) {
@@ -53,7 +59,6 @@ for (const device of localDevices) {
     }
 }
 
-console.log(`Migration Order Received: From ${BALENA_SOURCE_FLEET_URL} to ${BALENA_TARGET_FLEET_URL} over to ${BALENA_TARGET_FLEET_SLUG}`)
 console.table(finalDevices)
 console.log("")
 
