@@ -52,5 +52,5 @@ COPY . .
 RUN chmod +x entry.sh
 
 ## Wait for us to go in and run script manually
-CMD ["entry.sh"]
+CMD ["tail", "-f", "/dev/null"]
 
