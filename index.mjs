@@ -2,10 +2,11 @@
 
 // Script to migrate all local devices between balenaCloud environments. Read README.md for detailled instructions. 
 
-$.shell = '/usr/bin/bash'  // zx can't run on sh in Alpine correctly: https://github.com/google/zx/issues/164
+$.shell = await $`which bash`  // zx can't run on sh in Alpine correctly: https://github.com/google/zx/issues/164
 $.prefix = ''
 
 const { getSdk } = require('balena-sdk');
+const semver = require('balena-semver')
 
 const BALENA_SOURCE_FLEET_TOKEN = process.env.BALENA_SOURCE_FLEET_TOKEN | ""
 const BALENA_SOURCE_FLEET_URL = process.env.BALENA_SOURCE_FLEET_URL | "balena-cloud.com"
@@ -26,25 +27,35 @@ const balena_targetsdk = getSdk({
 await balena_targetsdk.auth.loginWithToken(BALENA_TARGET_FLEET_TOKEN)
 
 // Fetch all devices in the source fleet
-const sourceDevices = await balena_sourcesdk.models.device.getAllByApplication(BALENA_SOURCE_FLEET_SLUG)
+const sourceDevices = await balena_sourcesdk.models.device.getAllByApplication(BALENA_SOURCE_FLEET_SLUG, {
+    "$select": ["os_version", "overall_status", "device_name", "uuid"],
+})
 
 console.log(`Migration Order Received: From ${BALENA_SOURCE_FLEET_URL} to ${BALENA_TARGET_FLEET_URL} over to ${BALENA_TARGET_FLEET_SLUG}`)
 
 // Scan local devices available
-const localDevices = JSON.parse((await $`sudo balena scan --json`).stdout)
+const sudo = (await $`whoami`).stdout.trim() === 'root' ? '' : 'sudo'
+const localDevices = await spinner('Scanning local devices', async () => JSON.parse(await $`${sudo} balena scan --json`).stdout)
 
 const finalDevices = []
 
-// Remove offline devices from the source fleet - More work needed. Giving false positives
-// Need to surface overall status in the device resources
+const semverRegex = /\d+\.\d+\.\d+/;
+
+console.log("Finding offline devices or devices running balenaOS version < 2.85.0 in the fleet. Removing these from migration order:")
 for (const device in sourceDevices) {
-    if (!sourceDevices[device].is_connected_to_vpn && sourceDevices[device].api_heartbeat_state === "offline") {
-        console.log("Found offline devices in the fleet. Removing these from migration order:")
-        console.log(sourceDevices[device].device_name)
+    // Remove devices running <balenaOS v2.85.0
+    // Development mode was introduced from 2.85.0 - https://github.com/balena-os/meta-balena/blob/master/CHANGELOG.md#v2850
+    if (semver.gt('2.85.0', sourceDevices[device].os_version.match(semverRegex)[0])) {
+        console.log(`${sourceDevices[device].device_name}: ${sourceDevices[device].os_version}`)
+        sourceDevices.splice(device)
+    }
+
+    // Remove offline devices from the source fleet - More work needed. Giving false positives
+    if (sourceDevices[device].overall_status === 'idle') {
+        console.log(`${sourceDevices[device].device_name}: ${sourceDevices[device].overall_status}`)
         sourceDevices.splice(device)
     }
 }
-
 
 // Cross-reference local and source fleet devices to create final list of online, local devices
 for (const device of localDevices) {
@@ -137,7 +148,9 @@ for (const device of finalDevices) {
     const sourceDeviceTags = await balena_sourcesdk.models.device.tags.getAllByDevice(device.uuid)
 
     // Store Device Note
-    const sourceDeviceNote = (await balena_sourcesdk.models.device.get(device.uuid)).note
+    const sourceDeviceNote = (await balena_sourcesdk.models.device.get(device.uuid, {
+        "$select": ["note"],
+    }))
 
     console.log(`Stored ${device.name}'s device level configuration, tags, variables ✅`)
 

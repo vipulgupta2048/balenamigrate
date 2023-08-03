@@ -21,6 +21,7 @@
   "homepage": "https://github.com/vipulgupta2048/balena-migrate#readme",
   "dependencies": {
     "balena-sdk": "^17.10.0",
+    "balena-semver": "^2.3.3",
     "zx": "^7.2.3"
   }
 }
