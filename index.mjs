@@ -90,18 +90,20 @@ await question(`Migrating ${Object.keys(finalDevices).length} devices. Press ent
 await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena login --token ${BALENA_SOURCE_FLEET_TOKEN}`
 await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena whoami`
 
-// Creating SSH Keys 
-const random = (await $`date +%N`).stdout.trim()
-const homePath = (await $`echo $HOME`).stdout.trim()
-const sshKeyPath = `${homePath}/.ssh/id_ed25519_${random}`
-await $`ssh-keygen -t ed25519 -C "autokit@balena.io" -f ${sshKeyPath} -P ""`
+// Creating Temp SSH Keys only if running on root gateway device and not on personal machines
+if (whoami === 'root') {
+    const random = (await $`date +%N`).stdout.trim()
+    const homePath = (await $`echo $HOME`).stdout.trim()
+    const sshKeyPath = `${homePath}/.ssh/id_ed25519_${random}`
+    await $`ssh-keygen -t ed25519 -C "autokit@balena.io" -f ${sshKeyPath} -P ""`
 
-await $`eval ssh-agent -s && ssh-add ${sshKeyPath}`
+    await $`eval ssh-agent -s && ssh-add ${sshKeyPath}`
 
-await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena key add Main-${random} ${sshKeyPath}.pub`
-const balenaKeyId = await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena keys | grep "Main-${random}" | awk '{print $1}'`
+    await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena key add Main-${random} ${sshKeyPath}.pub`
+    const balenaKeyId = await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena keys | grep "Main-${random}" | awk '{print $1}'`
 
-console.log("Created and added temp. SSH key to access local devices with ID:", balenaKeyId)
+    console.log("Created and added temp. SSH key to access local devices with ID:", balenaKeyId)
+}
 
 // Convert devices to dev mode
 for (const device of finalDevices) {
