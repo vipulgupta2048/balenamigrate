@@ -2,8 +2,9 @@
 
 // Script to migrate all local devices between balenaCloud environments. Read README.md for detailled instructions. 
 
-$.shell = await $`which bash`  // zx can't run on sh in Alpine correctly: https://github.com/google/zx/issues/164
+$.shell = await which("bash")  // zx can't run on sh in Alpine correctly: https://github.com/google/zx/issues/164
 $.prefix = ''
+$.verbose = false; // Toggle to get outputs from all commands
 
 const { getSdk } = require('balena-sdk');
 const semver = require('balena-semver')
@@ -16,14 +17,20 @@ const BALENA_TARGET_FLEET_TOKEN = process.env.BALENA_TARGET_FLEET_TOKEN | ""
 const BALENA_TARGET_FLEET_URL = process.env.BALENA_TARGET_FLEET_SLUG | "balena-staging.com"
 const BALENA_TARGET_FLEET_SLUG = process.env.BALENA_TARGET_FLEET_SLUG | ""
 
+// Check if balena-cli is installed and available
+await which("balena")
+
 const balena_sourcesdk = getSdk({
     apiUrl: `https://api.${BALENA_SOURCE_FLEET_URL}`,
 });
+
 await balena_sourcesdk.auth.loginWithToken(BALENA_SOURCE_FLEET_TOKEN)
+
 
 const balena_targetsdk = getSdk({
     apiUrl: `https://api.${BALENA_TARGET_FLEET_URL}`,
 });
+
 await balena_targetsdk.auth.loginWithToken(BALENA_TARGET_FLEET_TOKEN)
 
 // Fetch all devices in the source fleet
@@ -35,24 +42,23 @@ console.log(`Migration Order Received: From ${BALENA_SOURCE_FLEET_URL} to ${BALE
 
 // Scan local devices available
 const sudo = (await $`whoami`).stdout.trim() === 'root' ? '' : 'sudo'
-const localDevices = await spinner('Scanning local devices', async () => JSON.parse(await $`${sudo} balena scan --json`).stdout)
+const localDevices = JSON.parse((await $`${sudo} balena scan --json`).stdout)
 
 const finalDevices = []
 
 const semverRegex = /\d+\.\d+\.\d+/;
 
-console.log("Finding offline devices or devices running balenaOS version < 2.85.0 in the fleet. Removing these from migration order:")
+console.log("Finding offline devices or devices running balenaOS version < 2.85.0 in the fleet\n")
 for (const device in sourceDevices) {
     // Remove devices running <balenaOS v2.85.0
     // Development mode was introduced from 2.85.0 - https://github.com/balena-os/meta-balena/blob/master/CHANGELOG.md#v2850
     if (semver.gt('2.85.0', sourceDevices[device].os_version.match(semverRegex)[0])) {
-        console.log(`${sourceDevices[device].device_name}: ${sourceDevices[device].os_version}`)
+        console.log(`Removing ${sourceDevices[device].device_name}: ${sourceDevices[device].os_version}`)
         sourceDevices.splice(device)
     }
-
-    // Remove offline devices from the source fleet - More work needed. Giving false positives
-    if (sourceDevices[device].overall_status === 'idle') {
-        console.log(`${sourceDevices[device].device_name}: ${sourceDevices[device].overall_status}`)
+    // Remove offline devices from the source fleet
+    else if (sourceDevices[device].overall_status !== 'idle') {
+        console.log(`Removing ${sourceDevices[device].device_name}: ${sourceDevices[device].overall_status}`)
         sourceDevices.splice(device)
     }
 }
@@ -83,6 +89,19 @@ await question(`Migrating ${Object.keys(finalDevices).length} devices. Press ent
 // Login to source fleet
 await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena login --token ${BALENA_SOURCE_FLEET_TOKEN}`
 await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena whoami`
+
+// Creating SSH Keys 
+const random = (await $`date +%N`).stdout.trim()
+const homePath = (await $`echo $HOME`).stdout.trim()
+const sshKeyPath = `${homePath}/.ssh/id_ed25519_${random}`
+await $`ssh-keygen -t ed25519 -C "autokit@balena.io" -f ${sshKeyPath} -P ""`
+
+await $`eval ssh-agent -s && ssh-add ${sshKeyPath}`
+
+await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena key add Main-${random} ${sshKeyPath}.pub`
+const balenaKeyId = await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena keys | grep "Main-${random}" | awk '{print $1}'`
+
+console.log("Created and added temp. SSH key to access local devices with ID:", balenaKeyId)
 
 // Convert devices to dev mode
 for (const device of finalDevices) {
@@ -167,14 +186,16 @@ for (const device of finalDevices) {
         await $`echo "os-config update" | balena ssh ${device.address}`
         console.log(`Device successfully joined ${BALENA_TARGET_FLEET_URL} ✅ Find it in ${BALENA_TARGET_FLEET_SLUG} \n`)
         // Waiting for it to join
-        await sleep(20000)
+        await sleep(10000)
     }
+
+    console.log(`Waiting for it to come online on ${BALENA_TARGET_FLEET_SLUG}`)
 
     let uuidFinder = true
     let uuidTarget = null
+    console.log(`Waiting for it to come online on ${BALENA_TARGET_FLEET_SLUG}`)
     while (uuidFinder) {
         try {
-
             if (await balena_targetsdk.models.device.isOnline(device.uuid)) {
                 uuidTarget = device.uuid
                 uuidFinder = false
@@ -243,6 +264,12 @@ for (const device of finalDevices) {
 
 console.log("Results of migration")
 console.table(JSON.parse((await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena devices --fleet ${BALENA_TARGET_FLEET_SLUG} --json`).stdout))
+
+console.log("Cleaning up migration setup")
+await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena key rm ${balenaKeyId} --yes`
+await $`ssh-add -d ${sshKeyPath}.pub`
+
+console.log("Deleting temp. SSH key:", balenaKeyId)
 
 
 // ## Problems that you might face
