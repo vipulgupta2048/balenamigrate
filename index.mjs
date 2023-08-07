@@ -93,13 +93,13 @@ await question(`Migrating ${Object.keys(finalDevices).length} devices. Press ent
 
 // Login to source fleet
 await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena login --token ${BALENA_SOURCE_FLEET_TOKEN}`
-await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena whoami`
+// await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena whoami`
 
 // Creating Temp SSH Keys only if running on root gateway device and not on personal machines
+const random = (await $`date +%N`).stdout.trim()
+const homePath = (await $`echo $HOME`).stdout.trim()
+const sshKeyPath = `${homePath}/.ssh/id_ed25519_${random}`
 if (whoami === 'root') {
-    const random = (await $`date +%N`).stdout.trim()
-    const homePath = (await $`echo $HOME`).stdout.trim()
-    const sshKeyPath = `${homePath}/.ssh/id_ed25519_${random}`
     await $`ssh-keygen -t ed25519 -C "autokit@balena.io" -f ${sshKeyPath} -P ""`
 
     // Still flaky - sometimes the ssh-agent doesn't start. Use the command to start it eval `ssh-agent`
@@ -157,7 +157,7 @@ if (Object.keys(sourceVariables).length) {
 
 // Login to target fleet
 await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena login --token ${BALENA_TARGET_FLEET_TOKEN}`
-await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena whoami`
+// await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena whoami`
 
 // await spinner('If this isnt correct, stop now... waiting 5 seconds', () => $`sleep 5`)
 
@@ -270,14 +270,18 @@ for (const device of finalDevices) {
 console.log("Results of migration")
 console.table(JSON.parse((await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena devices --fleet ${BALENA_TARGET_FLEET_SLUG} --json`).stdout))
 
-const balenaKeyId = (await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena keys | grep "Main-${random}" | awk '{print $1}'`).stdout.trim()
+if (whoami === 'root') {
+    // Login to target fleet
+    await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena login --token ${BALENA_SOURCE_FLEET_TOKEN}`
 
-console.log("Cleaning up migration setup")
-await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena key rm ${balenaKeyId} --yes`
-await $`ssh-add -d ${sshKeyPath}.pub`
+    const balenaKeyId = (await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena keys | grep "Main-${random}" | awk '{print $1}'`).stdout.trim()
 
-console.log("Deleting temp. SSH key:", balenaKeyId)
+    console.log("Cleaning up migration setup")
+    await $`BALENARC_BALENA_URL=${BALENA_SOURCE_FLEET_URL} balena key rm ${balenaKeyId} --yes`
+    await $`ssh-add -d ${sshKeyPath}.pub`
 
+    console.log("Deleting temp. SSH key:", balenaKeyId)
+}
 
 // ## Problems that you might face
 
