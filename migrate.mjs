@@ -9,13 +9,15 @@ $.verbose = false; // Toggle to get outputs from all commands
 const { getSdk } = require('balena-sdk');
 const semver = require('balena-semver')
 
+// FILL VALUES FOR THESE FIELDS - SOURCE FLEET
 const BALENA_SOURCE_FLEET_TOKEN = process.env.BALENA_SOURCE_FLEET_TOKEN || ""
 const BALENA_SOURCE_FLEET_URL = process.env.BALENA_SOURCE_FLEET_URL || "balena-cloud.com"
-const BALENA_SOURCE_FLEET_SLUG = process.env.BALENA_SOURCE_FLEET_SLUG || "balena/testbot-rig"
+const BALENA_SOURCE_FLEET_SLUG = process.env.BALENA_SOURCE_FLEET_SLUG || ""
 
+// FILL VALUES FOR THESE FIELDS - TARGET FLEET
 const BALENA_TARGET_FLEET_TOKEN = process.env.BALENA_TARGET_FLEET_TOKEN || ""
 const BALENA_TARGET_FLEET_URL = process.env.BALENA_TARGET_FLEET_SLUG || "bm.balena-dev.com"
-const BALENA_TARGET_FLEET_SLUG = process.env.BALENA_TARGET_FLEET_SLUG || "balena/testbot-rig"
+const BALENA_TARGET_FLEET_SLUG = process.env.BALENA_TARGET_FLEET_SLUG || ""
 
 // Check if balena-cli is installed and available
 await which("balena")
