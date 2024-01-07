@@ -9,13 +9,13 @@ $.verbose = false; // Toggle to get outputs from all commands
 const { getSdk } = require('balena-sdk');
 const semver = require('balena-semver')
 
-const BALENA_SOURCE_FLEET_TOKEN = process.env.BALENA_SOURCE_FLEET_TOKEN | ""
-const BALENA_SOURCE_FLEET_URL = process.env.BALENA_SOURCE_FLEET_URL | "balena-cloud.com"
-const BALENA_SOURCE_FLEET_SLUG = process.env.BALENA_SOURCE_FLEET_SLUG | ""
+const BALENA_SOURCE_FLEET_TOKEN = process.env.BALENA_SOURCE_FLEET_TOKEN || ""
+const BALENA_SOURCE_FLEET_URL = process.env.BALENA_SOURCE_FLEET_URL || "balena-cloud.com"
+const BALENA_SOURCE_FLEET_SLUG = process.env.BALENA_SOURCE_FLEET_SLUG || "balena/testbot-rig"
 
-const BALENA_TARGET_FLEET_TOKEN = process.env.BALENA_TARGET_FLEET_TOKEN | ""
-const BALENA_TARGET_FLEET_URL = process.env.BALENA_TARGET_FLEET_SLUG | "balena-staging.com"
-const BALENA_TARGET_FLEET_SLUG = process.env.BALENA_TARGET_FLEET_SLUG | ""
+const BALENA_TARGET_FLEET_TOKEN = process.env.BALENA_TARGET_FLEET_TOKEN || ""
+const BALENA_TARGET_FLEET_URL = process.env.BALENA_TARGET_FLEET_SLUG || "bm.balena-dev.com"
+const BALENA_TARGET_FLEET_SLUG = process.env.BALENA_TARGET_FLEET_SLUG || "balena/testbot-rig"
 
 // Check if balena-cli is installed and available
 await which("balena")
@@ -27,31 +27,43 @@ const balena_sourcesdk = getSdk({
 
 await balena_sourcesdk.auth.loginWithToken(BALENA_SOURCE_FLEET_TOKEN)
 
-
 const balena_targetsdk = getSdk({
     apiUrl: `https://api.${BALENA_TARGET_FLEET_URL}`,
 });
 
 await balena_targetsdk.auth.loginWithToken(BALENA_TARGET_FLEET_TOKEN)
 
-// Fetch all devices in the source fleet
-let sourceDevices = await balena_sourcesdk.models.device.getAllByApplication(BALENA_SOURCE_FLEET_SLUG, {
-    "$select": ["os_version", "overall_status", "device_name", "uuid"],
-})
-
-const semverRegex = /\d+\.\d+\.\d+/;
-console.log("Finding offline devices or devices running balenaOS version < 2.85.0 in the fleet\n")
-sourceDevices = sourceDevices.filter(device => {
-    // Remove devices running <balenaOS v2.85.0
-    // Development mode was introduced from 2.85.0 - https://github.com/balena-os/meta-balena/blob/master/CHANGELOG.md#v2850
-    // Remove offline devices from the source fleet
-    return device.overall_status === 'idle' && semver.gte(device.os_version.match(semverRegex)[0], '2.85.0')
-})
-
-
-// Scan local devices available
 const whoami = (await $`whoami`).stdout.trim()
 const sudo = whoami === 'root' ? '' : 'sudo'
+
+// Fetch info about devices pending migration in the source fleet
+async function sourceThemDevices(balena_sourcesdk) {
+    let devices = []
+    if (argv.uuid) {
+        devices = await balena_sourcesdk.models.device.get(argv.uuid, {
+            "$select": ["os_version", "overall_status", "device_name", "uuid"],
+        })
+    } else {
+        devices = await balena_sourcesdk.models.device.getAllByApplication(BALENA_SOURCE_FLEET_SLUG, {
+            "$select": ["os_version", "overall_status", "device_name", "uuid"],
+        })
+    }
+
+    devices = Array.isArray(devices) ? devices : [devices]
+    
+    console.log("Finding offline devices or devices running balenaOS version < 2.85.0 in the fleet\n")
+    const semverRegex = /\d+\.\d+\.\d+/;
+    return devices.filter(device => {
+        // Remove offline devices from the source fleet
+        // Remove devices running < balenaOS v2.85.0
+        // Development mode was introduced from 2.85.0 - https://github.com/balena-os/meta-balena/blob/master/CHANGELOG.md#v2850
+        return device.overall_status === 'idle' && semver.gte(device.os_version.match(semverRegex)[0], '2.85.0')
+    })
+}
+
+// Fetch devices from the source fleet
+const sourceDevices = await sourceThemDevices(balena_sourcesdk)
+// Scan devices locally available
 const localDevices = JSON.parse((await $`${sudo} balena scan --json`).stdout)
 
 const finalDevices = []
