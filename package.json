@@ -1,14 +1,14 @@
 {
-  "name": "balena-migrate",
-  "version": "1.0.0",
+  "name": "balenamigrate",
+  "version": "1.1.0",
   "description": "",
-  "main": "index.mjs",
+  "main": "migrate.mjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vipulgupta2048/balena-migrate.git"
+    "url": "git+https://github.com/vipulgupta2048/balenamigrate.git"
   },
   "keywords": [
     "balena"
@@ -16,9 +16,9 @@
   "author": "Vipul Gupta (@vipulgupta2048)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/vipulgupta2048/balena-migrate/issues"
+    "url": "https://github.com/vipulgupta2048/balenamigrate/issues"
   },
-  "homepage": "https://github.com/vipulgupta2048/balena-migrate#readme",
+  "homepage": "https://github.com/vipulgupta2048/balenamigrate#readme",
   "dependencies": {
     "balena-sdk": "^17.10.0",
     "balena-semver": "^2.3.3",
