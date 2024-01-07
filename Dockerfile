@@ -49,7 +49,7 @@ RUN npm ci
 
 COPY . .
 
-RUN chmod u+x entry.sh && eval `ssh-agent -s`
+RUN chmod u+x entry.sh && eval `ssh-agent -s` && ./entry.sh
 
 ## Wait for us to go in and run script manually
 ENTRYPOINT ["tail", "-f", "/dev/null"]
