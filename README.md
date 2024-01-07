@@ -19,28 +19,41 @@ Make sure to double-check your devices before pressing <enter> to migrate. Don't
 
 ## Get Started 
 
-The tool needs latest balenaCLI. First install [balena-cli](https://github.com/balena-io/balena-cli/blob/master/INSTALL.md) and clone the repository. Next, provide the values of `Source` and `Target` in the `index.mjs` script and run the following command to initiate the migration. The tool has only been tested using bash.
-
-Th
+The tool needs latest balenaCLI. First install [balena-cli](https://github.com/balena-io/balena-cli/blob/master/INSTALL.md) and clone the repository. 
 
 ```bash
 sudo balena scan # this is to confirm CLI is installed correctly
 npm install
-npx zx index.mjs
 ```
+
+## Begin Migrating Devices 
+
+Next, provide the values of `Source` and `Target` in the `migrate.mjs` script and run the following command to initiate the migration. The tool has only been tested using bash. Running this command will migrate all devices present in the `Source` fleet to the `Target` fleet. For more information, how this happens refer to the next section and configuration section. 
+
+```bash
+npx zx migrate.mjs
+```
+
+To migrate only a single device, fill in the values referred above in the `migrate.js` script and run the following command by providing the UUID of the device you wish to migrate. 
+
+```bash
+npx zx migrate.mjs --uuid <UUID OF THE DEVICE>
+```
+
 
 ### What is happening!
 
-1. First the tool scans for devices locally and in the source fleet to create a final list of devices based on pre-defined parameters (Needs balenaCLI to be installed). 
+1. First the tool scans for device(s) locally and in the source fleet to create a final list of devices based on pre-defined parameters (Needs balenaCLI to be installed). 
 2. (Optional) Creates temporary SSH keys to access local production devices. 
 3. SSH into said devices and convert all devices to development OS variant. 
 4. Once complete, migrate device to new target environement using balena join 
-5. Re-assigns device old configuration, tags, names and related settings when it comes online in the new environment. 
-6. (Optional) Clean up SSH keys that are created.
+5. Re-assigns device old configuration, tags, names and related settings when it comes online in the new environment.
+6. Repeats until all devices in the list have been migrated.  
+7. (Optional) Clean up SSH keys that are created.
 
 ## Configuration Guide
 
-You can either set up these environment variables or even add values to the [variables](https://github.com/vipulgupta2048/balena-migrate/blob/632219ec887ff28fcf9c503a6f078996f0227d80/index.mjs#L12-L18) defined in the script. **Values for all variables are required.**
+You can either set up these environment variables or even add values to the [variables](https://github.com/vipulgupta2048/balena-migrate/blob/632219ec887ff28fcf9c503a6f078996f0227d80/migrate.mjs#L12-L18) defined in the script. **Values for all variables are required.**
 
 | Environment Variable      | Description                                                      |
 | ------------------------- | ---------------------------------------------------------------- |
