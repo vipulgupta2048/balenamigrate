@@ -66,7 +66,7 @@ async function sourceThemDevices(balena_sourcesdk) {
 // Fetch devices from the source fleet
 const sourceDevices = await sourceThemDevices(balena_sourcesdk)
 // Scan devices locally available
-const localDevices = JSON.parse((await $`${sudo} balena scan --json`).stdout)
+const localDevices = JSON.parse((await $`DEBUG=0 ${sudo} balena scan --json`).stdout)
 
 const finalDevices = []
 
@@ -193,18 +193,23 @@ for (const device of finalDevices) {
 
     console.log(`Stored ${device.name}'s device level configuration, tags, variables ✅`)
 
+
     // Joining target fleet
     try {
         console.log(`\nMigrating ${migratedDevices} out of ${finalDevices.length} devices`)
         await $`BALENARC_BALENA_URL=${BALENA_TARGET_FLEET_URL} balena join ${device.address} --fleet ${BALENA_TARGET_FLEET_SLUG} --pollInterval 1`
+        
         console.log(`Device successfully joined ${BALENA_TARGET_FLEET_URL} ✅ Find it in ${BALENA_TARGET_FLEET_SLUG} \n`)
+        
         // Waiting for it to join
         await sleep(20000)
         await $`echo "systemctl restart prepare-openvpn" | balena ssh ${device.address}`
     } catch (e) {
-        console.log("Detected known error. Deploying troubleshooting steps.")
+        console.log(`Detected error, it was:\n${e}\n\nTrying troubleshooting steps.`)
         await $`echo "os-config update" | balena ssh ${device.address}`
+        
         console.log(`Device successfully joined ${BALENA_TARGET_FLEET_URL} ✅ Find it in ${BALENA_TARGET_FLEET_SLUG} \n`)
+        
         // Waiting for it to join
         await sleep(10000)
     }
