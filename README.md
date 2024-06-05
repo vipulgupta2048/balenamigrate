@@ -40,6 +40,10 @@ To migrate only a single device, fill in the values referred above in the `migra
 npx zx migrate.mjs --uuid <UUID OF THE DEVICE>
 ```
 
+Here's a screenshot of what you can expect from a successful migration!
+
+<img width="873" alt="Screenshot 2024-06-05 at 1 04 14 PM" src="https://github.com/vipulgupta2048/balenamigrate/assets/22801822/1779d202-75c9-4c7d-aa7b-7e2c99ed26f8">
+
 
 ### What is happening!
 
